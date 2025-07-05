@@ -68,7 +68,7 @@ python3 create_vm.py
 
 ---
 
-## After that, just input these values when prompted, and your email service will be up and running within 5 minutes:
+## After that, just input these values when prompted, and your VSCode service will be up and running within 5 minutes:
 
 ```
 Enter VM username [azureuser]:
