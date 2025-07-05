@@ -72,7 +72,7 @@ async def main():
 
     username = prompt_input("Enter VM username", "azureuser")
     password = prompt_input("Enter VM password", "azurepassword1234!", secret=True)
-    domain = prompt_input("Enter main domain", "win10dev.xyz")
+    domain = prompt_input("Enter main domain", "example.com")
     subdomain = prompt_input("Enter subdomain (e.g., 'vscode')", "vscode")
     if subdomain:
         subdomain = subdomain.strip().strip('.')
@@ -80,7 +80,7 @@ async def main():
     else:
         fqdn = domain
     print_info(f"Full domain to configure: {fqdn}")
-    resource_group = prompt_input("Enter resource group name", "win10dev")
+    resource_group = prompt_input("Enter resource group name", "vscodegroup")
     pc_name = 'vscode'#''.join(random.choices(string.ascii_lowercase, k=6))
     vm_name = prompt_input("Enter VM name", pc_name)
     location = prompt_input("Enter Azure region", "uksouth")
