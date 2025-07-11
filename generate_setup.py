@@ -1,12 +1,12 @@
 def generate_setup(DOMAIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, PORT, VOLUME_DIR="/opt/code-server", DNS_HOOK_SCRIPT="/usr/local/bin/dns-hook-script.sh"):
-    
+    SERVICE_USER="coder"
     letsencrypt_options_url = "https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf"
     ssl_dhparams_url = "https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem"
    
     script_template = f"""#!/bin/bash
 set -e
 
-SERVICE_USER="coder"
+
 
 # ========== VALIDATION ==========
 echo "[1/12] Validating inputs..."
@@ -33,7 +33,7 @@ if ss -tulnp | grep -q ":{PORT}"; then
     
     # Try to stop conflicting services
     echo "Stopping any existing code-server instances..."
-    systemctl stop code-server@$SERVICE_USER || true
+    systemctl stop code-server@{SERVICE_USER} || true
     pkill -f "code-server" || true
     sleep 2
     
@@ -158,7 +158,7 @@ npm install electron --save-dev
 # ========== DOCKER INSTALLATION ==========
 echo "[7/12] Installing Docker..."
 curl -fsSL https://get.docker.com | sh
-usermod -aG docker $SERVICE_USER || true
+usermod -aG docker {SERVICE_USER} || true
 
 # ========== KUBERNETES TOOLS ==========
 echo "[8/12] Installing kubectl..."
@@ -178,16 +178,16 @@ echo "[10/12] Installing code-server..."
 curl -fsSL https://code-server.dev/install.sh | HOME=/root sh
 
 # ========== USER SETUP ==========
-echo "[11/12] Configuring service user '$SERVICE_USER'..."
-if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-    useradd -m -s /bin/bash "$SERVICE_USER"
-    echo "$SERVICE_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$SERVICE_USER
-    chmod 440 /etc/sudoers.d/$SERVICE_USER
+echo "[11/12] Configuring service user '{SERVICE_USER}'..."
+if ! id -u "{SERVICE_USER}" >/dev/null 2>&1; then
+    useradd -m -s /bin/bash "{SERVICE_USER}"
+    echo "{SERVICE_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{SERVICE_USER}
+    chmod 440 /etc/sudoers.d/{SERVICE_USER}
 
     # Setup pyenv environment for service user
-    su - $SERVICE_USER -c 'curl -fsSL https://pyenv.run | bash'
+    su - {SERVICE_USER} -c 'curl -fsSL https://pyenv.run | bash'
 
-    su - $SERVICE_USER -c 'cat >> ~/.bashrc <<EOF
+    su - {SERVICE_USER} -c 'cat >> ~/.bashrc <<EOF
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 if command -v pyenv 1>/dev/null 2>&1; then
@@ -196,7 +196,7 @@ if command -v pyenv 1>/dev/null 2>&1; then
 fi
 EOF'
 
-    su - $SERVICE_USER -c 'export PYENV_ROOT="$HOME/.pyenv"; export PATH="$PYENV_ROOT/bin:$PATH"; eval "$(pyenv init --path)"; eval "$(pyenv init -)"; pyenv install -s 3.9.7; pyenv global 3.9.7'
+    su - {SERVICE_USER} -c 'export PYENV_ROOT="$HOME/.pyenv"; export PATH="$PYENV_ROOT/bin:$PATH"; eval "$(pyenv init --path)"; eval "$(pyenv init -)"; pyenv install -s 3.9.7; pyenv global 3.9.7'
 fi
 
 # ========== CODE-SERVER CONFIG ==========
@@ -210,12 +210,12 @@ password: {ADMIN_PASSWORD}
 cert: false
 EOF
 
-chown -R $SERVICE_USER:$SERVICE_USER {VOLUME_DIR}
+chown -R {SERVICE_USER}:{SERVICE_USER} {VOLUME_DIR}
 chmod 700 {VOLUME_DIR}/config
 chmod 600 {VOLUME_DIR}/config/config.yaml
 
-mkdir -p /home/$SERVICE_USER/.config
-ln -sf {VOLUME_DIR}/config /home/$SERVICE_USER/.config/code-server
+mkdir -p /home/{SERVICE_USER}/.config
+ln -sf {VOLUME_DIR}/config /home/{SERVICE_USER}/.config/code-server
 
 # ========== VSCode EXTENSIONS ==========
 echo "Installing VSCode extensions..."
@@ -243,7 +243,7 @@ extensions=(
 )
 
 for extension in "${{extensions[@]}}"; do
-    su - $SERVICE_USER -c "code-server --install-extension $extension"
+    su - {SERVICE_USER} -c "code-server --install-extension $extension"
 done
 
 # ========== SERVICE CONFIGURATION ==========
@@ -252,16 +252,16 @@ cat > /etc/systemd/system/code-server@.service.d/override.conf <<EOF
 [Service]
 Restart=on-failure
 RestartSec=5s
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/$SERVICE_USER/.pyenv/shims:/home/$SERVICE_USER/.pyenv/bin"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/{SERVICE_USER}/.pyenv/shims:/home/{SERVICE_USER}/.pyenv/bin"
 EOF
 
 systemctl daemon-reexec
 systemctl daemon-reload
-systemctl enable --now code-server@$SERVICE_USER
+systemctl enable --now code-server@{SERVICE_USER}
 
-if ! systemctl is-active --quiet code-server@$SERVICE_USER; then
+if ! systemctl is-active --quiet code-server@{SERVICE_USER}; then
     echo "ERROR: code-server service failed to start"
-    journalctl -u code-server@$SERVICE_USER -b --no-pager -n 10
+    journalctl -u code-server@{SERVICE_USER} -b --no-pager -n 10
     exit 1
 fi
 
@@ -327,7 +327,7 @@ fi
 
  # Verify services
 systemctl is-active --quiet nginx || echo "WARNING: Nginx is not running"
-systemctl is-active --quiet code-server@$SERVICE_USER || echo "WARNING: code-server is not running"
+systemctl is-active --quiet code-server@{SERVICE_USER} || echo "WARNING: code-server is not running"
 
  
 # Complete the installation by accessing the web interface
@@ -336,7 +336,7 @@ until curl -s http://localhost:{PORT} | grep -q "Initial configuration"; do
     sleep 5
 done
 
-####THIS HAD TO DO MANUALLY AFTER SETTING UP -- THIS WILL SERVE THE BASE OF THE MODIFICATION
+####SSL CERTIFICATE SETUP WITH NGXIS
 $ sudo systemctl restart code-server@coder
 sudo systemctl status code-server@coder
 $ sudo ss -tulnp | grep :8080
@@ -348,7 +348,7 @@ echo "ngix certbot..."
 # 1) Email = ADMIN_EMAIL
 # 2) y, ACME server. Do you agree
 # 3) n, EFF news, campaigns, and ways to support digital freedom.
-printf '%s\\ny\\ny\\n' "{ADMIN_EMAIL}" | sudo certbot --nginx -d vscode.win10dev.xyz
+printf '%s\\ny\\ny\\n' "{ADMIN_EMAIL}" | sudo certbot --nginx -d {DOMAIN_NAME}
 
 sudo ls -l /etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem
 
@@ -357,12 +357,15 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-available/default
 
 # Write nginx config automatically
-cat > /etc/nginx/sites-available/{DOMAIN_NAME} <<EOF
+SSL_DOMAIN_NAME={DOMAIN_NAME}
+SSL_PORT={PORT}
+
+cat > /etc/nginx/sites-available/vscode <<EOF
 server {{
     listen 80;
     server_name {DOMAIN_NAME};
 
-    return 301 https://\$host\$request_uri;
+    return 301 https://\\$host\\$request_uri;
 }}
 
 server {{
@@ -374,25 +377,41 @@ server {{
 
     location / {{
         proxy_pass http://localhost:{PORT}/;
-        proxy_set_header Host \$host;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Host \\$host;
+        proxy_set_header Upgrade \\$http_upgrade;
         proxy_set_header Connection upgrade;
         proxy_set_header Accept-Encoding gzip;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
     }}
 }}
 EOF
 
+
 # Enable the site by symlinking
-ln -sf /etc/nginx/sites-available/{DOMAIN_NAME} /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/vscode /etc/nginx/sites-enabled/
+nginx -t && systemctl restart nginx
+ 
+# ========== VERIFICATION ==========
+echo "[9/9] Verifying setup..."
 
-# Test nginx config and reload
-nginx -t && systemctl reload nginx
+# Verify Nginx config
+if ! nginx -t; then
+    echo "ERROR: Nginx configuration test failed"
+    exit 1
+fi
 
-# Restart services to apply changes
-systemctl restart nginx
-systemctl restart code-server@coder
+# Verify SSL certificate
+if [ ! -f "/etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem" ]; then
+    echo "ERROR: SSL certificate not found!"
+    exit 1
+fi
+
+# Verify port accessibility
+if ! curl -s -o /dev/null -w "%{{http_code}}" http://localhost:{PORT} | grep -q 200; then
+    echo "ERROR: Cannot access Forgejo on port {PORT}"
+    exit 1
+fi
 
 # Automate certbot renewal cron job if not already set
 CRON_CMD="0 3 * * * /usr/bin/certbot renew --quiet --post-hook 'systemctl reload nginx'"
@@ -401,11 +420,7 @@ CRON_CMD="0 3 * * * /usr/bin/certbot renew --quiet --post-hook 'systemctl reload
 # Sudo Permission to coder
 sudo chown -R coder:coder /home/coder/.config
 
-
-echo "Setup complete!"
-
-
-
+ 
 echo "Setup complete!"
 """
     return script_template
