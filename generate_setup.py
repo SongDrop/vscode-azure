@@ -409,7 +409,7 @@ fi
 
 # Verify port accessibility
 if ! curl -s -o /dev/null -w "%{{http_code}}" http://localhost:{PORT} | grep -q 200; then
-    echo "ERROR: Cannot access Forgejo on port {PORT}"
+    echo "ERROR: Cannot access vscode on port {PORT}"
     exit 1
 fi
 
