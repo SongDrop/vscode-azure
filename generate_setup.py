@@ -1,4 +1,4 @@
-def generate_setup(DOMAIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, PORT, VOLUME_DIR="/opt/code-server", DNS_HOOK_SCRIPT="/usr/local/bin/dns-hook-script.sh"):
+def generate_setup(DOMAIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, PORT, VOLUME_DIR="/opt/code-server"):
     SERVICE_USER = "coder"
     letsencrypt_options_url = "https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf"
     ssl_dhparams_url = "https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem"
@@ -267,7 +267,10 @@ systemctl enable --now code-server@{SERVICE_USER}
 
 # ========== FIREWALL ==========
 echo "[15/20] Configuring firewall..."
-ufw allow 22,80,443,{PORT}/tcp
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow {PORT}/tcp
 ufw --force enable
 
 # ========== SSL ==========
@@ -281,35 +284,17 @@ sudo systemctl status code-server@coder
 sudo ss -tulnp | grep :8080
 sudo systemctl restart nginx
 sudo systemctl status nginx
-
-if [ -f "{DNS_HOOK_SCRIPT}" ]; then
-    chmod +x "{DNS_HOOK_SCRIPT}"
-    certbot certonly --manual --preferred-challenges=dns \\
-        --manual-auth-hook "{DNS_HOOK_SCRIPT} add" \\
-        --manual-cleanup-hook "{DNS_HOOK_SCRIPT} clean" \\
-        --agree-tos --email "{ADMIN_EMAIL}" \\
-        -d "{DOMAIN_NAME}" -d "*.{DOMAIN_NAME}" \\
-        --non-interactive --manual-public-ip-logging-ok
-else
-    echo "No DNS hook found. Using standard Nginx challenge..."
-    echo "ngix certbot..."
-    # Non-interactive input:
-    # 1) Email = ADMIN_EMAIL
-    # 2) y, ACME server. Do you agree
-    # 3) n, EFF news, campaigns, and ways to support digital freedom.
-    printf '%s\\ny\\ny\\n' "{ADMIN_EMAIL}" | sudo certbot --nginx -d {DOMAIN_NAME}
-fi
-
+sudo certbot --nginx -d {DOMAIN_NAME} --non-interactive --agree-tos --email {ADMIN_EMAIL} --redirect
 
 sudo ls -l /etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem
 
+# ========== NGINX ==========
+echo "[17/20] Configuring Nginx..."
 # Remove default nginx config if exists
 rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-available/default
 
-# ========== NGINX ==========
-echo "[17/20] Configuring Nginx..."
-rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default
+# Create vscode nginx config 
 cat > /etc/nginx/sites-available/vscode <<EOF
 server {{
     listen 80;
@@ -323,12 +308,12 @@ server {{
     ssl_certificate_key /etc/letsencrypt/live/{DOMAIN_NAME}/privkey.pem;
     location / {{
         proxy_pass http://localhost:{PORT}/;
-        proxy_set_header Host \\$host;
-        proxy_set_header Upgrade \\$http_upgrade;
-        proxy_set_header Connection \\$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
         proxy_set_header Accept-Encoding gzip;
-        proxy_set_header X-Real-IP \\$remote_addr;
-        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }}
 }}
 EOF
@@ -353,7 +338,6 @@ if ! curl -s -o /dev/null -w "%{{http_code}}" http://localhost:{PORT} | grep -q 
 fi
 
 echo "[20/20] Setup complete! Access: https://{DOMAIN_NAME}:{PORT}"
-
 
 
 #Installed Vscode extensions
