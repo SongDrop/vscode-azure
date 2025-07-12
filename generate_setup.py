@@ -276,6 +276,12 @@ mkdir -p /etc/letsencrypt
 curl -s "{letsencrypt_options_url}" > /etc/letsencrypt/options-ssl-nginx.conf
 curl -s "{ssl_dhparams_url}" > /etc/letsencrypt/ssl-dhparams.pem
 
+sudo systemctl restart code-server@coder
+sudo systemctl status code-server@coder
+sudo ss -tulnp | grep :8080
+sudo systemctl restart nginx
+sudo systemctl status nginx
+
 if [ -f "{DNS_HOOK_SCRIPT}" ]; then
     chmod +x "{DNS_HOOK_SCRIPT}"
     certbot certonly --manual --preferred-challenges=dns \\
@@ -286,8 +292,20 @@ if [ -f "{DNS_HOOK_SCRIPT}" ]; then
         --non-interactive --manual-public-ip-logging-ok
 else
     echo "No DNS hook found. Using standard Nginx challenge..."
-    printf '%s\\ny\\nn\\n' "{ADMIN_EMAIL}" | certbot --nginx -d "{DOMAIN_NAME}" --non-interactive --agree-tos --redirect
+    echo "ngix certbot..."
+    # Non-interactive input:
+    # 1) Email = ADMIN_EMAIL
+    # 2) y, ACME server. Do you agree
+    # 3) n, EFF news, campaigns, and ways to support digital freedom.
+    printf '%s\\ny\\ny\\n' "{ADMIN_EMAIL}" | sudo certbot --nginx -d {DOMAIN_NAME}
 fi
+
+
+sudo ls -l /etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem
+
+# Remove default nginx config if exists
+rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-available/default
 
 # ========== NGINX ==========
 echo "[17/20] Configuring Nginx..."
@@ -307,7 +325,7 @@ server {{
         proxy_pass http://localhost:{PORT}/;
         proxy_set_header Host \\$host;
         proxy_set_header Upgrade \\$http_upgrade;
-        proxy_set_header Connection upgrade;
+        proxy_set_header Connection \\$connection_upgrade;
         proxy_set_header Accept-Encoding gzip;
         proxy_set_header X-Real-IP \\$remote_addr;
         proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
