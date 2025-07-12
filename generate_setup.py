@@ -273,23 +273,8 @@ ufw allow 443/tcp
 ufw allow {PORT}/tcp
 ufw --force enable
 
-# ========== SSL ==========
-echo "[16/20] Setting up SSL..."
-mkdir -p /etc/letsencrypt
-curl -s "{letsencrypt_options_url}" > /etc/letsencrypt/options-ssl-nginx.conf
-curl -s "{ssl_dhparams_url}" > /etc/letsencrypt/ssl-dhparams.pem
-
-sudo systemctl restart code-server@coder
-sudo systemctl status code-server@coder
-sudo ss -tulnp | grep :8080
-sudo systemctl restart nginx
-sudo systemctl status nginx
-sudo certbot --nginx -d {DOMAIN_NAME} --non-interactive --agree-tos --email {ADMIN_EMAIL} --redirect
-
-sudo ls -l /etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem
-
 # ========== NGINX ==========
-echo "[17/20] Configuring Nginx..."
+echo "[16/20] Configuring Nginx..."
 # Remove default nginx config if exists
 rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-available/default
@@ -308,17 +293,31 @@ server {{
     ssl_certificate_key /etc/letsencrypt/live/{DOMAIN_NAME}/privkey.pem;
     location / {{
         proxy_pass http://localhost:{PORT}/;
-        proxy_set_header Host \$host;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \\$host;
+        proxy_set_header Upgrade \\$http_upgrade;
+        proxy_set_header Connection \\$connection_upgrade;
         proxy_set_header Accept-Encoding gzip;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
     }}
 }}
 EOF
-ln -sf /etc/nginx/sites-available/vscode /etc/nginx/sites-enabled/
+
+ln -sf /etc/nginx/sites-available/vscode /etc/nginx/sites-enabled/vscode
 nginx -t && systemctl restart nginx
+
+# ========== SSL ==========
+echo "[17/20] Setting up SSL..."
+mkdir -p /etc/letsencrypt
+curl -s "{letsencrypt_options_url}" > /etc/letsencrypt/options-ssl-nginx.conf
+curl -s "{ssl_dhparams_url}" > /etc/letsencrypt/ssl-dhparams.pem
+
+sudo certbot --nginx -d {DOMAIN_NAME} --non-interactive --agree-tos --email {ADMIN_EMAIL} --redirect
+
+sudo ls -l /etc/letsencrypt/live/{DOMAIN_NAME}/fullchain.pem
+
+sudo systemctl restart code-server@coder
+sudo systemctl status code-server@coder
 
 # ========== RENEWAL ==========
 echo "[18/20] Setting certbot auto-renewal..."
